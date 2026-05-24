@@ -121,35 +121,59 @@ def is_free_now(game):
 
 def fetch_mobile_links_from_free_page():
     """
-    Finds all Epic mobile product links from /free-games.
-    Example:
-    /p/monument-valley-3-android-c7433e
-    /p/monument-valley-3-ios-e569e7
+    Finds Epic mobile product links from /free-games.
+    If Epic blocks GitHub Actions with 403, fallback to known current mobile giveaway links.
     """
-    r = requests.get(FREE_PAGE, headers=HEADERS, timeout=30)
-    r.raise_for_status()
+    fallback = {
+        "monument-valley-3": {
+            "android": "https://store.epicgames.com/p/monument-valley-3-android-c7433e",
+            "ios": "https://store.epicgames.com/p/monument-valley-3-ios-e569e7",
+        }
+    }
 
-    found = re.findall(r'https://store\.epicgames\.com/[a-zA-Z-]+/p/([^"?#\\]+)|/p/([^"?#\\]+)', r.text)
+    try:
+        r = requests.get(FREE_PAGE, headers=HEADERS, timeout=30)
 
-    links = {}
-    for a, b in found:
-        slug = a or b
-        slug = slug.strip("/")
+        if r.status_code == 403:
+            print("Free-games page returned 403. Using fallback mobile links.")
+            return fallback
 
-        if not slug:
-            continue
+        r.raise_for_status()
 
-        low = slug.lower()
-        if "android" not in low and "ios" not in low:
-            continue
+        found = re.findall(
+            r'https://store\.epicgames\.com/[a-zA-Z-]+/p/([^"?#\\]+)|/p/([^"?#\\]+)',
+            r.text
+        )
 
-        base = re.sub(r"-(android|ios)(-[a-z0-9]+)?$", "", slug, flags=re.I)
-        platform = "android" if "android" in low else "ios"
+        links = {}
 
-        links.setdefault(base, {})
-        links[base][platform] = f"https://store.epicgames.com/p/{slug}"
+        for a, b in found:
+            slug = a or b
+            slug = slug.strip("/")
 
-    return links
+            if not slug:
+                continue
+
+            low = slug.lower()
+            if "android" not in low and "ios" not in low:
+                continue
+
+            base = re.sub(r"-(android|ios)(-[a-z0-9]+)?$", "", slug, flags=re.I)
+            platform = "android" if "android" in low else "ios"
+
+            links.setdefault(base, {})
+            links[base][platform] = f"https://store.epicgames.com/p/{slug}"
+
+        if links:
+            return links
+
+        print("No mobile links found on page. Using fallback mobile links.")
+        return fallback
+
+    except Exception as e:
+        print(f"Free-games page scrape failed: {e}")
+        print("Using fallback mobile links.")
+        return fallback
 
 
 def platform_text(links):
