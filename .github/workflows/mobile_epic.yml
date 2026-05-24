@@ -1,0 +1,39 @@
+name: Epic Games Mobile Freebie Notifier
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  check-mobile-epic:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install requirements
+        run: pip install -r requirements.txt
+
+      - name: Run mobile Epic notifier
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: python mobile_epic.py
+
+      - name: Save seen file
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add seen_mobile_epic.json
+          git commit -m "Update Epic mobile seen freebies" || echo "No changes"
+          git pull --rebase
+          git push
